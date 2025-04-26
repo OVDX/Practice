@@ -1,18 +1,75 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { UsersService } from './users.service';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../../prisma/prisma.service';
+import { RegisterDto } from './dto/register.dto';
 
-describe('UsersService', () => {
-  let service: UsersService;
+@Injectable()
+export class UsersService {
+  constructor(private readonly prisma: PrismaService) {}
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [UsersService],
-    }).compile();
+  async findAll() {
+    return this.prisma.user.findMany();
+  }
 
-    service = module.get<UsersService>(UsersService);
-  });
+  async findById(id: number) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-});
+  async findByEmail(email: string) {
+    return this.prisma.user.findUnique({ where: { email } });
+  }
+
+  async create(dto: RegisterDto) {
+    const existingUser = await this.findByEmail(dto.email);
+    if (existingUser) throw new ConflictException('User already exists');
+
+    const hashedPassword = await bcrypt.hash(dto.Password, 10);
+
+    return this.prisma.user.create({
+      data: {
+        email: dto.email,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        picture: dto.avatar_url,
+        hashedPassword,
+      },
+    });
+  }
+
+  async validateUser(email: string, plainPassword: string) {
+    const user = await this.findByEmail(email);
+    if (!user || !user.hashedPassword) return null;
+
+    const isMatch = await bcrypt.compare(plainPassword, user.hashedPassword);
+    return isMatch ? user : null;
+  }
+
+  async findOrCreateGoogleUser(
+    email: string,
+    profile: {
+      firstName: string;
+      lastName: string;
+      picture?: string;
+      googleId: string;
+    },
+  ) {
+    let user = await this.findByEmail(email);
+    if (user) return user;
+
+    return this.prisma.user.create({
+      data: {
+        email,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        picture: profile.picture,
+        googleId: profile.googleId,
+      },
+    });
+  }
+}
