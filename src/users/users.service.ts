@@ -42,6 +42,12 @@ export class UsersService {
       },
     });
   }
+  async update(id: number, updateData: any) {
+    return this.prisma.user.update({
+      where: { id },
+      data: updateData,
+    });
+  }
 
   async validateUser(email: string, plainPassword: string) {
     const user = await this.findByEmail(email);

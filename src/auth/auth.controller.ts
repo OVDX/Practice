@@ -21,6 +21,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { ChangePasswordDto } from 'src/users/dto/change-password.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -43,7 +44,16 @@ export class AuthController {
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
-
+  @ApiResponse({ status: 400, description: 'Поточний пароль невірний' })
+  @ApiResponse({ status: 401, description: 'Користувача не знайдено' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  async changePassword(
+    @Req() req,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(req.user.userId, changePasswordDto);
+  }
   @Post('login')
   @ApiOperation({ summary: 'Авторизація користувача' })
   @ApiBody({ type: LoginDto })

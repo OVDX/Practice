@@ -1,14 +1,21 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
-@Entity({ name: 'users' })
+import { Receipt } from '../../receipts/entities/receipt.entity';
+
 export class User {
-  @PrimaryGeneratedColumn()
   id: number;
-  @Column()
-  name: string;
-  @Column()
+
   email: string;
-  @Column()
+
+  firstName: string;
+
+  lastName: string;
+
+  picture: string;
+
+  googleId: string;
+
   hashedPassword: string;
-  @Column({ type: 'text', nullable: true })
-  avatar_url: string;
+
+  accessToken: string;
+  createdAt: Date;
+  updatedAt: Date;
 }

@@ -1,9 +1,14 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { RegisterDto } from '../users/dto/register.dto';
 import { LoginDto } from '../users/dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
+import { ChangePasswordDto } from 'src/users/dto/change-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -38,19 +43,13 @@ export class AuthService {
 
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.usersService.findByEmail(email);
-    console.log('User:', user); // Debugging line
     if (!user || !user.hashedPassword) {
       return null;
     }
-
     const isPasswordValid = await bcrypt.compare(password, user.hashedPassword);
-    console.log('Hash in DB:', user.hashedPassword); // Чи це точно хеш?
-    console.log('Password from DTO:', password);
-    console.log('Is Password Valid:', isPasswordValid);
     if (!isPasswordValid) {
       return null;
     }
-
     return user;
   }
 
@@ -59,6 +58,29 @@ export class AuthService {
     const user = await this.usersService.create({
       ...dto,
       hashedPassword: hashedPassword,
+    });
+    return this.signIn(user);
+  }
+  async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('Користувача не знайдено');
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(
+      changePasswordDto.currentPassword,
+      user.hashedPassword,
+    );
+
+    if (!isCurrentPasswordValid) {
+      throw new BadRequestException('Поточний пароль невірний');
+    }
+    const newHashedPassword = await bcrypt.hash(
+      changePasswordDto.newPassword,
+      10,
+    );
+    await this.usersService.update(userId, {
+      hashedPassword: newHashedPassword,
     });
     return this.signIn(user);
   }
