@@ -9,7 +9,7 @@ export class ReceiptsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY, // Move to environment variable
+    apiKey: process.env.OPENAI_API_KEY,
   });
 
   async findAll() {
