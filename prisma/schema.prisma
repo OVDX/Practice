@@ -21,7 +21,7 @@ model User {
   updatedAt      DateTime  @updatedAt
   receipts       Receipt[]
 
-  @@map("users")
+ 
 }
 
 model Category {
@@ -29,28 +29,29 @@ model Category {
   name     String
   receiptItems ReceiptItem[]
 
-  @@map("categories")
+ 
 }
 
 model Receipt {
   id         Int           @id @default(autoincrement())
   userId     Int
   totalPrice Float
+  merchant   String
   date       String
   image_url  String
-  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items      ReceiptItem[]
+  user       User          @relation(fields: [userId], references: [id])
+  receiptItems      ReceiptItem[]
 
-  @@map("receipts")
+
 }
 
 model ReceiptItem {
   id        Int     @id @default(autoincrement())
   receiptId Int
   name      String
-  categoryId Int?
+  categoryId Int
   price     String
-  receipt   Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-  category   Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  @@map("receipt_items")
+  receipt   Receipt @relation(fields: [receiptId], references: [id])
+  category   Category     @relation(fields: [categoryId], references: [id])
+ 
 }
