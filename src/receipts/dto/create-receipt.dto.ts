@@ -16,11 +16,6 @@ export class CreateReceiptDto {
   @IsNumber()
   userId: number;
 
-  @ApiProperty({ description: 'ID категорії', required: false })
-  @IsOptional()
-  @IsNumber()
-  categoryId?: number;
-
   @ApiProperty({ description: 'Загальна сума чеку' })
   @IsNotEmpty()
   @IsNumber()
@@ -30,6 +25,11 @@ export class CreateReceiptDto {
   @IsNotEmpty()
   @IsString()
   date: string;
+
+  @ApiProperty({ description: 'Магазин' })
+  @IsNotEmpty()
+  @IsString()
+  merchant: string;
 
   @ApiProperty({ description: 'URL зображення чеку' })
   @IsNotEmpty()

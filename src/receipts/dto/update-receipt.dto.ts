@@ -20,6 +20,11 @@ export class UpdateReceiptDto {
   @IsNumber()
   categoryId?: number;
 
+  @ApiProperty({ description: 'ID категорії', required: false })
+  @IsOptional()
+  @IsString()
+  merchant?: string;
+
   @ApiProperty({ description: 'Загальна сума чеку', required: false })
   @IsOptional()
   @IsNumber()

@@ -14,7 +14,7 @@ export class CategoriesService {
   async findOne(id: number) {
     const category = await this.prisma.category.findUnique({
       where: { id },
-      include: { receipts: true },
+      include: { receiptItems: true },
     });
 
     if (!category) {

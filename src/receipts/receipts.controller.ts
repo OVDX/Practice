@@ -11,6 +11,8 @@ import {
   UploadedFile,
   UseInterceptors,
   UseGuards,
+  BadRequestException,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,6 +21,8 @@ import {
   ApiParam,
   ApiBody,
   ApiQuery,
+  ApiBearerAuth,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { ReceiptsService } from './receipts.service';
 import { Receipt } from './entities/receipt.entity';
@@ -29,15 +33,43 @@ import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 
 @ApiTags('receipts')
+@ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'))
 @Controller('receipts')
 export class ReceiptsController {
   constructor(private readonly receiptsService: ReceiptsService) {}
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
-  async upload(@UploadedFile() file: Express.Multer.File) {
-    return this.receiptsService.extractTextFromImage(file.buffer);
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      fileFilter: (req, file, callback) => {
+        if (!file.originalname.match(/\.(jpg|jpeg|png)$/)) {
+          return callback(new Error('Only image files are allowed!'), false);
+        }
+        callback(null, true);
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+      },
+    }),
+  )
+  async upload(@UploadedFile() file: Express.Multer.File, @Req() req) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+    return this.receiptsService.extractTextFromImage(file.buffer, req.user.id);
   }
 
   @Get()
@@ -47,7 +79,7 @@ export class ReceiptsController {
     description: 'Список всіх чеків',
     type: [Receipt],
   })
-  findAll(@CurrentUser() user): Promise<Receipt[]> {
+  findAll(@CurrentUser() user): Promise<any[]> {
     return this.receiptsService.findAll();
   }
 
@@ -60,7 +92,7 @@ export class ReceiptsController {
     type: Receipt,
   })
   @ApiResponse({ status: 404, description: 'Чек не знайдено' })
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<Receipt> {
+  findOne(@Param('id', ParseIntPipe) id: number): Promise<any> {
     return this.receiptsService.findOne(id);
   }
 
@@ -72,7 +104,7 @@ export class ReceiptsController {
     description: 'Список чеків користувача',
     type: [Receipt],
   })
-  findByUserId(@CurrentUser() user): Promise<Receipt[]> {
+  findByUserId(@CurrentUser() user): Promise<any[]> {
     return this.receiptsService.findByUserId(user.sub);
   }
 
@@ -88,7 +120,7 @@ export class ReceiptsController {
     status: 404,
     description: 'Користувача або категорію не знайдено',
   })
-  create(@Body() createReceiptDto: CreateReceiptDto): Promise<Receipt> {
+  create(@Body() createReceiptDto: CreateReceiptDto): Promise<any> {
     return this.receiptsService.create(createReceiptDto);
   }
 
@@ -108,7 +140,7 @@ export class ReceiptsController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateReceiptDto: UpdateReceiptDto,
-  ): Promise<Receipt> {
+  ): Promise<any> {
     return this.receiptsService.update(id, updateReceiptDto);
   }
 
