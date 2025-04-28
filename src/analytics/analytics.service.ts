@@ -1,124 +1,220 @@
-// import { Injectable } from '@nestjs/common';
-// import { PrismaService } from '../../prisma/prisma.service';
-// import { ReceiptsService } from '../receipts/receipts.service';
-// import { CategoriesService } from '../categories/categories.service';
-// import { ReceiptItemService } from 'src/receipt-item/receipt-item.service';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
-// @Injectable()
-// export class AnalyticsService {
-//   constructor(
-//     private readonly prisma: PrismaService,
-//     private readonly receiptsService: ReceiptsService,
-//     private readonly receiptItemService: ReceiptItemService,
-//     private readonly categoriesService: CategoriesService,
-//   ) {}
+@Injectable()
+export class AnalyticsService {
+  constructor(private readonly prisma: PrismaService) {}
 
-//   // Підрахунок загальних витрат за певний період
-//   async getTotalExpenses(startDate: string, endDate: string): Promise<number> {
-//     const receipts = await this.prisma.receipt.findMany({
-//       where: {
-//         date: {
-//           gte: new Date(startDate).toISOString(),
-//           lte: new Date(endDate).toISOString(),
-//         },
-//       },
-//     });
-//     return receipts.reduce((total, receipt) => total + receipt.totalPrice, 0);
-//   }
+  async getCategorySpendingByMonth(userId: number, year?: number) {
+    const currentYear = year || new Date().getFullYear();
 
-//   async getExpensesByCategory(startDate: string, endDate: string, userId: number) {
-//     const categories = await this.categoriesService.findAll();
+    const results = await this.prisma.$queryRaw`
+      SELECT 
+        c.id as "categoryId",
+        c.name as "categoryName",
+        EXTRACT(MONTH FROM r.date::timestamp) as month,
+        SUM(ri.price) as "totalSpent"
+      FROM "ReceiptItem" ri
+      JOIN "Receipt" r ON ri."receiptId" = r.id
+      JOIN "Category" c ON ri."categoryId" = c.id
+      WHERE r."userId" = ${userId}
+        AND EXTRACT(YEAR FROM r.date::timestamp) = ${currentYear}
+      GROUP BY c.id, c.name, EXTRACT(MONTH FROM r.date::timestamp)
+      ORDER BY EXTRACT(MONTH FROM r.date::timestamp), c.name
+    `;
 
-//     const expensesByCategory = await Promise.all(
-//       categories.map(async (category) => {
-//         const receiptItems = await this.receiptItemService.findAll();
-//         const totalCategoryExpense = receiptItems
-//           .filter((item) => item.categoryId === category.id)
-//           .reduce((sum, item) => sum + item.price, 0);
+    return results;
+  }
 
-//         return {
-//           categoryName: category.name,
-//           totalExpense: totalCategoryExpense,
-//         };
-//       }),
-//     );
+  async getMonthlySpending(userId: number, year?: number) {
+    const currentYear = year || new Date().getFullYear();
+    console.log('Current Year:', currentYear);
+    const results = await this.prisma.$queryRaw`
+      SELECT 
+        EXTRACT(MONTH FROM r.date::timestamp) as month,
+        SUM(r."totalPrice") as "totalSpent"
+      FROM "Receipt" r
+      WHERE r."userId" = ${userId}
+        AND EXTRACT(YEAR FROM r.date::timestamp) = ${currentYear}
+      GROUP BY EXTRACT(MONTH FROM r.date::timestamp)
+      ORDER BY EXTRACT(MONTH FROM r.date::timestamp)
+    `;
 
-//     return expensesByCategory;
-//   }
+    return results;
+  }
 
-//   // Середня сума чека за певний період
-//   async getAverageReceiptAmount(
-//     startDate: string,
-//     endDate: string,
-//   ): Promise<number> {
-//     const receipts = await this.prisma.receipt.findMany({
-//       where: {
-//         date: {
-//           gte: new Date(startDate),
-//           lte: new Date(endDate),
-//         },
-//       },
-//     });
+  async getTopCategories(
+    userId: number,
+    period?: { startDate: Date; endDate: Date },
+  ) {
+    let query = `
+      SELECT 
+        c.id as "categoryId",
+        c.name as "categoryName",
+        SUM(ri.price) as "totalSpent"
+      FROM "ReceiptItem" ri
+      JOIN "Receipt" r ON ri."receiptId" = r.id
+      JOIN "Category" c ON ri."categoryId" = c.id
+      WHERE r."userId" = ${userId}
+    `;
 
-//     if (receipts.length === 0) {
-//       return 0;
-//     }
+    // Додаємо фільтр по періоду, якщо він вказаний
+    if (period) {
+      const startDateStr = period.startDate.toISOString();
+      const endDateStr = period.endDate.toISOString();
+      query += ` AND r.date::timestamp >= '${startDateStr}'::timestamp
+                 AND r.date::timestamp <= '${endDateStr}'::timestamp`;
+    }
 
-//     const totalAmount = receipts.reduce(
-//       (sum, receipt) => sum + receipt.totalPrice,
-//       0,
-//     );
-//     return totalAmount / receipts.length;
-//   }
+    query += `
+      GROUP BY c.id, c.name
+      ORDER BY "totalSpent" DESC
+      LIMIT 10
+    `;
 
-//   // Тренди по датах (витрати по місяцях)
-//   async getExpensesByMonth(startDate: string, endDate: string) {
-//     const receipts = await this.prisma.receipt.findMany({
-//       where: {
-//         date: {
-//           gte: new Date(startDate),
-//           lte: new Date(endDate),
-//         },
-//       },
-//     });
+    const results = await this.prisma.$queryRawUnsafe(query);
+    return results;
+  }
 
-//     const expensesByMonth = receipts.reduce((acc, receipt) => {
-//       const month = receipt.date.getMonth() + 1; // 0 - January, 1 - February, ...
-//       const year = receipt.date.getFullYear();
-//       const key = `${year}-${month}`;
+  async getMerchantSpending(
+    userId: number,
+    period?: { startDate: Date; endDate: Date },
+  ) {
+    let whereClause: Prisma.ReceiptWhereInput = { userId };
 
-//       if (!acc[key]) {
-//         acc[key] = 0;
-//       }
-//       acc[key] += receipt.totalPrice;
+    if (period) {
+      whereClause.date = {
+        gte: new Date(period.startDate).toISOString(),
+        lte: new Date(period.endDate).toISOString(),
+      };
+    }
 
-//       return acc;
-//     }, {});
+    const results = await this.prisma.receipt.groupBy({
+      by: ['merchant'],
+      where: whereClause,
+      _sum: {
+        totalPrice: true,
+      },
+      orderBy: {
+        _sum: {
+          totalPrice: 'desc',
+        },
+      },
+    });
 
-//     return expensesByMonth;
-//   }
+    return results.map((item) => ({
+      merchant: item.merchant,
+      totalSpent: item._sum?.totalPrice || 0,
+    }));
+  }
 
-//   // Найпопулярніші категорії по витратах
-//   async getTopCategoriesByExpenses(limit: number = 5) {
-//     const categories = await this.categoriesService.findAll();
+  async getDailySpendingTrend(userId: number, startDate: Date, endDate: Date) {
+    // Перетворюємо дати в формат ISO для SQL запиту
+    const startDateStr = startDate.toISOString();
+    const endDateStr = endDate.toISOString();
 
-//     const expensesByCategory = await Promise.all(
-//       categories.map(async (category) => {
-//         const receiptItems = await this.receiptItemService.findAll();
-//         const totalCategoryExpense = receiptItems
-//           .filter((item) => item.categoryId === category.id)
-//           .reduce((sum, item) => sum + item.price, 0);
+    const results = await this.prisma.$queryRaw`
+      SELECT 
+        DATE(r.date::timestamp) as day,
+        SUM(r."totalPrice") as "totalSpent"
+      FROM "Receipt" r
+      WHERE r."userId" = ${userId}
+        AND r.date::timestamp >= ${startDateStr}::timestamp
+        AND r.date::timestamp <= ${endDateStr}::timestamp
+      GROUP BY DATE(r.date::timestamp)
+      ORDER BY DATE(r.date::timestamp)
+    `;
 
-//         return {
-//           categoryName: category.name,
-//           totalExpense: totalCategoryExpense,
-//         };
-//       }),
-//     );
+    return results;
+  }
 
-//     const sortedExpenses = expensesByCategory.sort(
-//       (a, b) => b.totalExpense - a.totalExpense,
-//     );
-//     return sortedExpenses.slice(0, limit);
-//   }
-// }
+  async getSpendingOverview(userId: number) {
+    // Get current month, previous month, and current year
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1; // JavaScript months are 0-indexed
+
+    const firstDayOfCurrentMonth = new Date(currentYear, currentMonth - 1, 1);
+    const lastDayOfCurrentMonth = new Date(currentYear, currentMonth, 0);
+
+    const firstDayOfPreviousMonth = new Date(currentYear, currentMonth - 2, 1);
+    const lastDayOfPreviousMonth = new Date(currentYear, currentMonth - 1, 0);
+
+    const firstDayOfYear = new Date(currentYear, 0, 1);
+
+    // Перетворюємо дати в формат ISO для запитів Prisma
+    const firstDayOfCurrentMonthStr = firstDayOfCurrentMonth.toISOString();
+    const lastDayOfCurrentMonthStr = lastDayOfCurrentMonth.toISOString();
+    const firstDayOfPreviousMonthStr = firstDayOfPreviousMonth.toISOString();
+    const lastDayOfPreviousMonthStr = lastDayOfPreviousMonth.toISOString();
+    const firstDayOfYearStr = firstDayOfYear.toISOString();
+    const todayStr = today.toISOString();
+
+    // Current month total
+    const currentMonthTotal = await this.prisma.receipt.aggregate({
+      where: {
+        userId,
+        date: {
+          gte: firstDayOfCurrentMonthStr,
+          lte: lastDayOfCurrentMonthStr,
+        },
+      },
+      _sum: {
+        totalPrice: true,
+      },
+    });
+
+    // Previous month total
+    const previousMonthTotal = await this.prisma.receipt.aggregate({
+      where: {
+        userId,
+        date: {
+          gte: firstDayOfPreviousMonthStr,
+          lte: lastDayOfPreviousMonthStr,
+        },
+      },
+      _sum: {
+        totalPrice: true,
+      },
+    });
+
+    // Year to date total
+    const yearToDateTotal = await this.prisma.receipt.aggregate({
+      where: {
+        userId,
+        date: {
+          gte: firstDayOfYearStr,
+          lte: todayStr,
+        },
+      },
+      _sum: {
+        totalPrice: true,
+      },
+    });
+
+    return {
+      currentMonth: {
+        totalSpent: currentMonthTotal._sum?.totalPrice || 0,
+        period: {
+          start: firstDayOfCurrentMonth,
+          end: lastDayOfCurrentMonth,
+        },
+      },
+      previousMonth: {
+        totalSpent: previousMonthTotal._sum?.totalPrice || 0,
+        period: {
+          start: firstDayOfPreviousMonth,
+          end: lastDayOfPreviousMonth,
+        },
+      },
+      yearToDate: {
+        totalSpent: yearToDateTotal._sum?.totalPrice || 0,
+        period: {
+          start: firstDayOfYear,
+          end: today,
+        },
+      },
+    };
+  }
+}

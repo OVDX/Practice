@@ -16,5 +16,5 @@ export class UpdateReceiptItemDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  price?: string;
+  price?: number;
 }

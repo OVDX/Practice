@@ -14,5 +14,5 @@ export class CreateReceiptItemDto {
   @ApiProperty({ description: 'Ціна товару' })
   @IsNotEmpty()
   @IsString()
-  price: string;
+  price: number;
 }

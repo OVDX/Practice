@@ -3,5 +3,5 @@ export class ReceiptItem {
 
   name: string;
 
-  price: string;
+  price: number;
 }

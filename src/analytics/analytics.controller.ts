@@ -1,135 +1,136 @@
-// import {
-//   Controller,
-//   Get,
-//   Param,
-//   ParseIntPipe,
-//   UseGuards,
-//   Request,
-// } from '@nestjs/common';
-// import { PrismaService } from '../../prisma/prisma.service';
-// import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-// import {
-//   ApiBearerAuth,
-//   ApiTags,
-//   ApiOperation,
-//   ApiParam,
-//   ApiResponse,
-// } from '@nestjs/swagger';
-// import { AnalyticsService } from './analytics.service';
-// // Define interfaces for raw query results
+import {
+  Controller,
+  Get,
+  Query,
+  Param,
+  ParseIntPipe,
+  Req,
+} from '@nestjs/common';
+import { AnalyticsService } from './analytics.service';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { PeriodDto } from './period.dto';
 
-// @Controller('analytics')
-// @UseGuards(JwtAuthGuard)
-// @ApiBearerAuth()
-// export class ReceiptAnalyticsController {
-//   constructor(private readonly analyticsService: AnalyticsService) {}
+@ApiTags('analytics')
+@Controller('analytics')
+export class AnalyticsController {
+  constructor(private readonly analyticsService: AnalyticsService) {}
 
-//   @Get('spending-by-category')
-//   @ApiOperation({ summary: 'Get spending by category for the current user' })
-//   @ApiResponse({
-//     status: 200,
-//     description: 'Returns spending amounts grouped by category',
-//   })
-//   async getSpendingByCategory(@Request() req) {
-//     const userId = req.user.id;
-//     return this.analyticsService.getSpendingByCategory(userId);
-//   }
+  @Get('category-spending/')
+  @ApiOperation({ summary: 'Get category spending by month for a user' })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description: 'Year for analytics (defaults to current year)',
+  })
+  async getCategorySpendingByMonth(@Req() req, @Query('year') year?: number) {
+    return this.analyticsService.getCategorySpendingByMonth(req.user.id, year);
+  }
 
-//   @Get('spending-over-time')
-//   @ApiOperation({ summary: 'Get spending over time for the current user' })
-//   @ApiResponse({
-//     status: 200,
-//     description: 'Returns spending amounts grouped by date',
-//   })
-//   async getSpendingOverTime(@Request() req) {
-//     const userId = req.user.id;
-//     return this.analyticsService.getSpendingOverTime(userId);
-//   }
+  @Get('monthly-spending/')
+  @ApiOperation({ summary: 'Get monthly spending totals for a user' })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description: 'Year for analytics (defaults to current year)',
+  })
+  async getMonthlySpending(@Req() req, @Query('year') year?: number) {
+    return this.analyticsService.getMonthlySpending(req.user.id, year);
+  }
 
-//   @Get('merchants-summary')
-//   @ApiOperation({
-//     summary: 'Get spending summary by merchant for the current user',
-//   })
-//   @ApiResponse({
-//     status: 200,
-//     description: 'Returns spending amounts grouped by merchant',
-//   })
-//   async getMerchantsSummary(@Request() req) {
-//     const userId = req.user.id;
-//     return this.analyticsService.getMerchantsSummary(userId);
-//   }
+  @Get('top-categories/')
+  @ApiOperation({ summary: 'Get top spending categories for a user' })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    type: String,
+    description: 'Start date in ISO format (yyyy-mm-dd)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    type: String,
+    description: 'End date in ISO format (yyyy-mm-dd)',
+  })
+  async getTopCategories(@Req() req, @Query() periodDto?: PeriodDto) {
+    const period =
+      periodDto?.startDate && periodDto?.endDate
+        ? {
+            startDate: new Date(periodDto.startDate),
+            endDate: new Date(periodDto.endDate),
+          }
+        : undefined;
 
-//   @Get('top-items')
-//   @ApiOperation({ summary: 'Get top purchased items for the current user' })
-//   @ApiResponse({
-//     status: 200,
-//     description: 'Returns most frequently purchased items',
-//   })
-//   async getTopItems(@Request() req) {
-//     const userId = req.user.id;
-//     return this.analyticsService.getTopItems(userId);
-//   }
+    return this.analyticsService.getTopCategories(req.user.id, period);
+  }
 
-//   @Get('monthly-summary/:year')
-//   @ApiOperation({ summary: 'Get monthly spending summary for a specific year' })
-//   @ApiParam({
-//     name: 'year',
-//     description: 'Year for the monthly summary',
-//     example: '2024',
-//   })
-//   @ApiResponse({
-//     status: 200,
-//     description: 'Returns monthly spending summary',
-//   })
-//   async getMonthlySummary(
-//     @Request() req,
-//     @Param('year', ParseIntPipe) year: number,
-//   ) {
-//     const userId = req.user.id;
-//     return this.analyticsService.getMonthlySummary(userId, year);
-//   }
+  @Get('merchant-spending/')
+  @ApiOperation({ summary: 'Get spending by merchant for a user' })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    type: String,
+    description: 'Start date in ISO format (yyyy-mm-dd)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    type: String,
+    description: 'End date in ISO format (yyyy-mm-dd)',
+  })
+  async getMerchantSpending(@Req() req, @Query() periodDto?: PeriodDto) {
+    const period =
+      periodDto?.startDate && periodDto?.endDate
+        ? {
+            startDate: new Date(periodDto.startDate),
+            endDate: new Date(periodDto.endDate),
+          }
+        : undefined;
 
-//   @Get('category-comparison/:categoryId/:period')
-//   @ApiOperation({
-//     summary: 'Compare spending in one category over different time periods',
-//   })
-//   @ApiParam({
-//     name: 'categoryId',
-//     description: 'Category ID to analyze',
-//     example: '1',
-//   })
-//   @ApiParam({
-//     name: 'period',
-//     description: 'Period for comparison (month, quarter, year)',
-//     example: 'month',
-//   })
-//   @ApiResponse({
-//     status: 200,
-//     description: 'Returns category spending comparison',
-//   })
-//   async getCategoryComparison(
-//     @Request() req,
-//     @Param('categoryId', ParseIntPipe) categoryId: number,
-//     @Param('period') period: string,
-//   ) {
-//     const userId = req.user.id;
-//     return this.analyticsService.getCategoryComparison(
-//       userId,
-//       categoryId,
-//       period,
-//     );
-//   }
+    return this.analyticsService.getMerchantSpending(req.user.id, period);
+  }
 
-//   @Get('spending-stats')
-//   @ApiOperation({
-//     summary: 'Get overall spending statistics for the current user',
-//   })
-//   @ApiResponse({
-//     status: 200,
-//     description: 'Returns spending stsatistics',
-//   })
-//   async getSpendingStats(@Request() req) {
-//     const userId = req.user.id;
-//     return this.analyticsService.getSpendingStats(userId);
-//   }
-// }
+  @Get('daily-trend/')
+  @ApiOperation({ summary: 'Get daily spending trend for a specified period' })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    type: String,
+    description: 'Start date in ISO format (yyyy-mm-dd)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    type: String,
+    description: 'End date in ISO format (yyyy-mm-dd)',
+  })
+  async getDailySpendingTrend(@Req() req, @Query() periodDto: PeriodDto) {
+    if (!periodDto.startDate || !periodDto.endDate) {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+
+      return this.analyticsService.getDailySpendingTrend(
+        req.user.id,
+        startDate,
+        endDate,
+      );
+    }
+
+    return this.analyticsService.getDailySpendingTrend(
+      req.user.id,
+      new Date(periodDto.startDate),
+      new Date(periodDto.endDate),
+    );
+  }
+
+  @Get('overview/')
+  @ApiOperation({
+    summary:
+      'Get spending overview (current month, previous month, year to date)',
+  })
+  async getSpendingOverview(@Req() req) {
+    return this.analyticsService.getSpendingOverview(req.user.id);
+  }
+}
