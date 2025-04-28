@@ -50,7 +50,7 @@ model ReceiptItem {
   receiptId Int
   name      String
   categoryId Int
-  price     String
+  price     Float
   receipt   Receipt @relation(fields: [receiptId], references: [id])
   category   Category     @relation(fields: [categoryId], references: [id])
  

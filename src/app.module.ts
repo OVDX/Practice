@@ -10,8 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import config from '../config';
 import { Prisma } from '@prisma/client';
 import { PrismaModule } from 'nestjs-prisma';
-// import { AnalyticsService } from './analytics/analytics.service';
-// import { AnalyticsModule } from './analytics/analytics.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -19,10 +18,9 @@ import { PrismaModule } from 'nestjs-prisma';
       isGlobal: true,
     }),
     PrismaModule,
-    ReceiptItemModule,
     ReceiptsModule,
     CategoriesModule,
-    // AnalyticsModule,
+    AnalyticsModule,
     AuthModule,
   ],
   controllers: [AppController],
